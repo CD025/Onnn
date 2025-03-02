@@ -4,25 +4,105 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirect Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        input {
+            padding: 8px;
+            flex: 1;
+        }
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .success {
+            background-color: green;
+            color: white;
+            border: none;
+        }
+        .danger {
+            background-color: red;
+            color: white;
+            border: none;
+        }
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+        li {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+    </style>
 </head>
 <body>
 
     <div>
         <p>
-            <label>Domain:</label>
-            <input type="text" placeholder="Enter domain (e.g., facebook.com)">
-            <label>Redirect URL:</label>
-            <input type="text" placeholder="Enter redirect URL (e.g., https://fake-facebook.com)">
-            <button>Add Redirect</button>
+            <div class="input-group">
+                <input type="text" id="domainInput" placeholder="Enter domain (e.g., facebook.com)">
+                <input type="text" id="redirectInput" placeholder="Enter redirect URL (e.g., https://fake-facebook.com)">
+                <button class="success" id="addRedirectBtn">Add Redirect</button>
+            </div>
         </p>
 
-        <ul>
-            <li>
-                <strong>example.com</strong> → https://redirect-example.com 
-                <button>Remove</button>
-            </li>
-        </ul>
+        <ul id="redirectList"></ul>
     </div>
 
+    <script>
+        const socket = new WebSocket("ws://localhost:8080");
+        let redirectRules = {};
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.action === "update_rules") {
+                redirectRules = data.rules;
+                updateList();
+            }
+        };
+
+        document.getElementById("addRedirectBtn").addEventListener("click", () => {
+            const domain = document.getElementById("domainInput").value.trim();
+            const redirect = document.getElementById("redirectInput").value.trim();
+
+            if (!domain || !redirect) return;
+
+            redirectRules[domain] = redirect;
+            socket.send(JSON.stringify({ action: "update_rules", rules: redirectRules }));
+            updateList();
+
+            document.getElementById("domainInput").value = "";
+            document.getElementById("redirectInput").value = "";
+        });
+
+        function updateList() {
+            const list = document.getElementById("redirectList");
+            list.innerHTML = "";
+            Object.keys(redirectRules).forEach(domain => {
+                const li = document.createElement("li");
+                li.innerHTML = `<strong>${domain}</strong> → ${redirectRules[domain]} 
+                    <button class="danger" onclick="removeRedirect('${domain}')">Remove</button>`;
+                list.appendChild(li);
+            });
+        }
+
+        function removeRedirect(domain) {
+            delete redirectRules[domain];
+            socket.send(JSON.stringify({ action: "update_rules", rules: redirectRules }));
+            updateList();
+        }
+    </script>
+
 </body>
-</html>
+        </html>
